@@ -1,0 +1,259 @@
+---
+title: "Project 1"
+author: "Group 1"
+date: "2025-10-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(nycflights13)
+library(lubridate)
+library(infer)
+library(knitr)
+options(scipen = 999)
+theme_set(theme_minimal(base_size = 12))
+```
+
+
+
+```{r creating the dataset}
+#only UA flights
+UA_flights <- flights |>
+  #only carrier UA
+  filter(carrier == "UA") |>
+  #Removes NA rows
+  drop_na()
+
+```
+
+**Data Cleaning**
+```{r data-cleaning}
+ua <- flights %>%
+  filter(carrier == "UA") %>%
+  left_join(weather, by = c("year", "month", "day", "hour", "origin")) %>%
+  mutate(
+    season = case_when(
+      month %in% c(12, 1, 2) ~ "Winter",
+      month %in% c(3, 4, 5)  ~ "Spring",
+      month %in% c(6, 7, 8)  ~ "Summer",
+      month %in% c(9, 10, 11)~ "Fall"
+    ),
+    Delay30 = dep_delay >= 30,
+    precip_cat = if_else(precip > median(weather$precip, na.rm = TRUE), "High", "Low")
+  ) %>%
+  filter(!is.na(dep_delay), !is.na(precip), !is.na(temp), !is.na(wind_speed), !is.na(visib))
+
+ua %>% summarise(total_rows = n(), unique_seasons = n_distinct(season), precip_levels = n_distinct(precip_cat))
+```
+
+# Summary tables for season and precipitation
+
+```{r summary-tables}
+season_summary <- ua %>%
+  group_by(season) %>%
+  summarise(
+    mean_delay = mean(dep_delay, na.rm = TRUE),
+    median_delay = median(dep_delay, na.rm = TRUE),
+    sd_delay = sd(dep_delay, na.rm = TRUE),
+    n = n()
+  ) %>%
+  arrange(desc(mean_delay))
+
+precip_summary <- ua %>%
+  group_by(precip_cat) %>%
+  summarise(
+    mean_delay = mean(dep_delay, na.rm = TRUE),
+    median_delay = median(dep_delay, na.rm = TRUE),
+    sd_delay = sd(dep_delay, na.rm = TRUE),
+    n = n()
+  )
+# Print to Console
+season_summary
+precip_summary
+
+# Save CSVs 
+readr::write_csv(season_summary, "season_summary.csv")
+readr::write_csv(precip_summary, "precip_summary.csv")
+```
+
+### A) Seasonal delays
+```{r plot-season, fig.width=7, fig.height=4}
+ggplot(ua, aes(x = season, y = dep_delay)) +
+  geom_boxplot(outlier.shape = NA, fill = "lightblue") +
+  coord_cartesian(ylim = c(-20, 200)) +
+  labs(
+    title = "Departure Delays by Season (UA Flights, NYC 2013)",
+    x = "Season",
+    y = "Departure Delay (minutes)"
+  )
+
+```
+### B) Precipitation delays
+```{r plot-precip, fig.width=7, fig.height=4}
+ggplot(ua, aes(x = precip_cat, y = dep_delay)) +
+  geom_boxplot(outlier.shape = NA, fill = "green") +
+  coord_cartesian(ylim = c(-20, 200)) +
+  labs(
+    title = "Departure Delays by Precipitation Level (UA Flights, NYC 2013)",
+    x = "Precipitation (High / Low)",
+    y = "Departure Delay (minutes)"
+  )
+```
+
+
+``` {r Time of day}
+
+```
+
+``` {r Time of year}
+library(tidyverse)
+library(nycflights13)
+set.seed(2025)
+
+FlightDelays <- flights %>%
+filter(carrier == "UA") %>%
+mutate(
+month = as.integer(month),
+season = case_when(
+month %in% c(12, 1, 2) ~ "Winter",
+month %in% c(3, 4, 5) ~ "Spring",
+month %in% c(6, 7, 8) ~ "Summer",
+month %in% c(9, 10, 11) ~ "Fall",
+TRUE ~ NA_character_
+),
+Delayed30 = if_else(is.na(dep_delay), NA, dep_delay >= 30)
+)
+
+month_summary <- FlightDelays %>%
+filter(!is.na(dep_delay)) %>%
+group_by(month) %>%
+summarize(
+n = n(),
+mean_delay = mean(dep_delay, na.rm = TRUE),
+median_delay = median(dep_delay, na.rm = TRUE),
+prop_delayed30 = mean(dep_delay >= 30, na.rm = TRUE)
+) %>%
+arrange(month)
+month_summary
+
+season_summary <- FlightDelays %>%
+filter(!is.na(dep_delay)) %>%
+group_by(season) %>%
+summarize(
+n = n(),
+mean_delay = mean(dep_delay, na.rm = TRUE),
+median_delay = median(dep_delay, na.rm = TRUE),
+prop_delayed30 = mean(dep_delay >= 30, na.rm = TRUE)
+)
+season_summary
+
+ggplot(month_summary, aes(x = factor(month), y = mean_delay)) +
+geom_col() +
+labs(x = "Month", y = "Mean departure delay (minutes)", title = "Mean departure delay by month for UA")
+
+ggplot(FlightDelays %>% filter(!is.na(dep_delay)), aes(x = factor(month), y = dep_delay)) +
+geom_boxplot() +
+labs(x = "Month", y = "Departure delay (minutes)", title = "Distribution of departure delays by month for UA")
+
+ggplot(FlightDelays %>% filter(!is.na(Delayed30)), aes(x = season, fill = Delayed30)) +
+geom_bar(position = "fill") +
+labs(x = "Season", y = "Proportion", title = "Proportion of flights delayed 30+ minutes by season") +
+scale_y_continuous(labels = scales::percent)
+
+perm_test_diff_means <- function(x, gvec, g1, g2, B = 5000, seed = NULL) {
+if (!is.null(seed)) set.seed(seed)
+keep <- gvec %in% c(g1, g2)
+xsub <- x[keep]
+gsub <- gvec[keep]
+n1 <- sum(gsub == g1)
+N <- length(xsub)
+observed <- mean(xsub[gsub == g1], na.rm = TRUE) - mean(xsub[gsub == g2], na.rm = TRUE)
+res <- replicate(B, {
+idx <- sample(N, n1, replace = FALSE)
+mean(xsub[idx], na.rm = TRUE) - mean(xsub[-idx], na.rm = TRUE)
+})
+pval <- (sum(abs(res) >= abs(observed)) + 1) / (B + 1)
+list(observed = observed, p.value = pval, null = res)
+}
+
+FlightDelays2 <- FlightDelays %>% filter(!is.na(dep_delay) & !is.na(season))
+res_summer_winter <- perm_test_diff_means(FlightDelays2$dep_delay, FlightDelays2$season, "Summer", "Winter", B = 5000, seed = 2025)
+res_summer_winter$observed
+res_summer_winter$p.value
+
+ggplot(tibble(stat = res_summer_winter$null), aes(x = stat)) +
+geom_histogram(bins = 50) +
+geom_vline(xintercept = res_summer_winter$observed, color = "red") +
+labs(title = "Permutation null: mean delay Summer - Winter", x = "Difference in means (minutes)")
+```
+
+``` {r Temperature}
+
+```
+
+``` {r Wind speed}
+
+```
+
+
+**Precipitation Test**
+```{r perm-tests}
+# Summer vs Winter
+two_seasons <- ua %>%
+  filter(season %in% c("Summer", "Winter")) %>%
+  select(dep_delay, season)
+
+obs_diff_season <- two_seasons %>%
+  group_by(season) %>%
+  summarise(mean_delay = mean(dep_delay, na.rm = TRUE)) %>%
+  pivot_wider(names_from = season, values_from = mean_delay) %>%
+  mutate(diff = Summer - Winter) %>%
+  pull(diff)
+
+perm_season <- two_seasons %>%
+  specify(dep_delay ~ season) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 5000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("Summer", "Winter"))
+
+p_val_season <- perm_season %>%
+  get_p_value(obs_stat = obs_diff_season, direction = "both") %>%
+  pull(p_value)
+
+cat("Observed mean diff (Summer - Winter):", round(obs_diff_season, 2), "minutes\n")
+cat("Permutation p-value (Summer vs Winter):", p_val_season, "\n\n")
+
+# Precipitation
+two_precip <- ua %>%
+  filter(precip_cat %in% c("High", "Low")) %>%
+  select(dep_delay, precip_cat)
+
+obs_diff_precip <- two_precip %>%
+  group_by(precip_cat) %>%
+  summarise(mean_delay = mean(dep_delay, na.rm = TRUE)) %>%
+  pivot_wider(names_from = precip_cat, values_from = mean_delay) %>%
+  mutate(diff = High - Low) %>%
+  pull(diff)
+
+perm_precip <- two_precip %>%
+  specify(dep_delay ~ precip_cat) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 5000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("High", "Low"))
+
+p_val_precip <- perm_precip %>%
+  get_p_value(obs_stat = obs_diff_precip, direction = "both") %>%
+  pull(p_value)
+
+cat("Observed mean diff (High - Low precip):", round(obs_diff_precip, 2), "minutes\n")
+cat("Permutation p-value (High vs Low precip):", p_val_precip, "\n")
+```
+
+
+
+
+``` {r Visibility}
+
+```
+
