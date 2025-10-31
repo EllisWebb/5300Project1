@@ -69,7 +69,7 @@ for (i in 1:N) {
 ggplot(tibble(perm), aes(x = perm)) +
   geom_histogram(bins = 20) +
   geom_vline(xintercept = observed, color = "red")+
-  labs(title = "Temperature Effect on Late Flights",
+  labs(title = "Temperature Effect on Very Late Flights",
        x = "Difference in proportions (High − Low)",
        y = "Count")
 
@@ -101,7 +101,7 @@ for (i in 1:N) {
 ggplot(tibble(perm), aes(x = perm)) +
   geom_histogram(bins = 20) +
   geom_vline(xintercept = observed, color = "red") +
-  labs(title = "Temperature Effect on Very-Late Flights",
+  labs(title = "Temperature Effect on Late Flights",
        x = "Difference in proportions (High − Low)",
        y = "Count")
 
