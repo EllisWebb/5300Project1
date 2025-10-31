@@ -8,7 +8,7 @@ library(tibble)
 UA_flights <- flights |>
   filter(carrier == "UA") |> 
   drop_na(dep_time) |>
-  mutate(delay = if_else(dep_delay > 30, TRUE, FALSE)) |>
+  mutate(very_late = if_else(dep_delay > 30, TRUE, FALSE)) |>
   mutate(late = if_else(dep_delay > 0,  TRUE, FALSE))
 
 ### Join ### 
@@ -31,14 +31,18 @@ ua_box <- ua_wx %>%
   filter(is_true == TRUE)
 
 
-ggplot(ua_box, aes(x = delay_type, y = temp, fill = delay_type)) +
-  geom_boxplot() +
+ggplot(ua_box, aes(x = delay_type, y = temp)) +
+  geom_boxplot(fill = "skyblue") +
   geom_hline(yintercept = median(ua_wx$temp, na.rm = TRUE),
-             linetype = "dashed", color = "red") +
-  labs(title = "Temperature Distribution by Delay Category",
-       x = "Delay Type",
-       y = "Temperature (°F)")+
-  theme(legend.position = "none")
+             linetype = "dashed", color = "red", linewidth = 1) +
+  scale_x_discrete(labels = c("late" = "Late Flights (0-30 Min)",
+                              "very_late" = "Very Late Flights (>30 Min)")) + 
+  labs(title = "Temperature Distribution by Delay Category (UA Flights, NYC 2013)",
+       x = NULL,
+       y = "Temperature (°F)") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(size = 11, face = "bold", hjust = 0.5))
 
 
 # ---------- Very Late: permutation test (difference in proportions) ---------- #
@@ -71,6 +75,7 @@ ggplot(tibble(perm), aes(x = perm)) +
 
 ## Two Sided P Value ## 
 2*(sum(perm >= observed) + 1) / (N + 1)
+print(observed)
 
 # ---------- Late: permutation test (difference in proportions) ----------
 ## H_0: P(Late | High Temp) = P(Late | Low Temp)
@@ -102,3 +107,4 @@ ggplot(tibble(perm), aes(x = perm)) +
 
 ## Two Sided P Value ## 
 2*(sum(perm >= observed) + 1) / (N + 1)
+print(observed)
