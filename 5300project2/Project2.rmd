@@ -1,0 +1,113 @@
+---
+title: "Project2Q2"
+author: "Aaron Donohoe"
+date: "2025-11-25"
+output: html_document
+---
+
+```{r library}
+library(tidyr)
+library(dplyr)
+library(nycflights13)
+library(ggplot2)
+```
+
+## Cleaning data
+
+
+```{r cleaning}
+UA_flights <- flights |>
+  filter(carrier == "UA") |>         # Only UA flights
+  drop_na(dep_time) |>
+  mutate(net_gain=dep_delay-arr_delay) |>
+  mutate(gain_per_hr=net_gain/(air_time/60))
+
+ggplot(data=UA_flights,mapping=aes(x=gain_per_hr))+
+  geom_boxplot(outlier.shape=NA)+
+  xlim(-20,25)
+
+ggplot(data=UA_flights,mapping=aes(x=distance,y=gain_per_hr))+
+  geom_point(position="jitter")
+
+```
+
+## length
+
+```{r grouping flight "length"}
+
+dist1<-UA_flights|>
+  filter(between(distance,0,800)) |>
+  pull(gain_per_hr)
+
+var(dist1, na.rm=TRUE)
+
+
+dist2<-UA_flights|>
+  filter(between(distance,800,2000)) |>
+  pull(gain_per_hr)
+
+var(dist2, na.rm=TRUE)
+
+dist3<-UA_flights|>
+  filter(between(distance,2000,3000)) |>
+  pull(gain_per_hr)
+
+var(dist3, na.rm=TRUE)
+
+dist4<-UA_flights|>
+  filter(between(distance,3000,5000)) |>
+  pull(gain_per_hr)
+
+var(dist4, na.rm=TRUE)
+```
+
+
+### normal gain dist??
+
+```{r explore}
+
+ggplot(data= dist1 , mapping=aes(x=gain_per_hr))+
+  geom_histogram()
+
+ggplot(data= dist2 , mapping=aes(x=gain_per_hr))+
+  geom_histogram()
+
+ggplot(data= dist3 , mapping=aes(x=gain_per_hr))+
+  geom_histogram()
+
+ggplot(data= dist4 , mapping=aes(x=gain_per_hr))+
+  geom_histogram()
+```
+
+
+## CI test
+
+```{r confI}
+
+t.test(dist1, conf.level=0.95)
+
+t.test(dist2, conf.level=0.95)
+
+t.test(dist3, conf.level=0.95)
+
+t.test(dist4, conf.level=0.95)
+
+```
+```{r plotCI test}
+
+ci_data <- data.frame(
+  group = c("0-800 Miles", "800-2000 Miles", "2000-3000 Miles", "3000-5000 Miles"),
+  mean  = c(7.708367, 3.017624, 1.906737, 1.029703),
+  lower = c(7.444675, 2.944360, 1.849256, 0.8020161),
+  upper = c(7.972059, 3.090889, 1.964218, 1.2573900)
+)
+
+ci_data$group <- factor(ci_data$group, levels = ci_data$group)
+
+ggplot(ci_data, aes(x = group, ymin = lower, ymax = upper)) +
+  geom_errorbar(width = 0.1, size = 1) +
+  labs(title="Confidence Intervals of Average Gain by Distance",
+       y="Average Gain (Hours)",
+       x="Distance Group (Miles)")
+
+```
