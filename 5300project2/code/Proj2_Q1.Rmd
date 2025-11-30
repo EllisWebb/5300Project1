@@ -1,0 +1,122 @@
+---
+title: "Project2-?1"
+author: "Carter Webb"
+date: "2025-11-26"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(nycflights13)
+library(dplyr)
+library(ggplot2)
+```
+
+
+
+```{r load}
+ua <- flights %>%
+  filter(carrier == "UA") %>%
+  drop_na(dep_delay, arr_delay) %>%
+  mutate(
+    gain = dep_delay - arr_delay,
+    late = dep_delay > 0,
+    very_late = dep_delay > 30
+  )
+```
+
+## Summaries By Late Catagory
+
+```{r summary}
+ua %>%
+  group_by(late) %>%
+  summarise(
+    mean_gain = mean(gain),
+    sd_gain   = sd(gain),
+    n         = n()
+  )
+
+ua %>%
+  group_by(very_late) %>%
+  summarise(
+    mean_gain = mean(gain),
+    sd_gain   = sd(gain),
+    n         = n()
+  )
+
+```
+
+## Box Plots
+
+```{r Box Plots}
+par(mfrow = c(2, 1)) 
+
+ggplot(ua, aes(x = late, y = gain)) +
+  geom_boxplot(fill = "orange") +
+  scale_x_discrete(labels = c("FALSE" = "On-time departure",
+                              "TRUE"  = "Departed late")) +
+  labs(
+    title = "Net Gain by Late Departures",
+    x = NULL,
+    y = "Gain (minutes)"
+  )
+
+ggplot(ua, aes(x = very_late, y = gain)) +
+  geom_boxplot(fill = "red") +
+  scale_x_discrete(labels = c("FALSE" = "≤ 30 min late",
+                              "TRUE"  = "> 30 min late")) +
+  labs(
+    title = "Net Gain by Very-Late Departures",
+    x = NULL,
+    y = "Gain (minutes)"
+  ) 
+```
+
+
+## QQ Plots Late vs On Time
+
+```{r qq.2}
+par(mfrow = c(1, 2)) 
+
+qqnorm(ua$gain[ua$late == FALSE],
+  main = "On-Time Departures",
+  ylab = "Sample Quantiles (Gain)")
+
+qqline(ua$gain[ua$late == FALSE], col = "orange")
+
+qqnorm(ua$gain[ua$late == TRUE],
+  main = "Late Departures",
+  ylab = "Sample Quantiles (Gain)")
+
+qqline(ua$gain[ua$late == TRUE], col = "orange")
+```
+
+
+## QQ Plots Very Late vs On Time
+
+```{r qq.1}
+par(mfrow = c(1, 2)) 
+
+qqnorm(ua$gain[ua$very_late == FALSE],
+  main = "On-Time Departures",
+  ylab = "Sample Quantiles (Gain)")
+
+qqline(ua$gain[ua$very_late == FALSE], col = "red")
+
+qqnorm(ua$gain[ua$very_late == TRUE],
+  main = "Very Late Departures",
+  ylab = "Sample Quantiles (Gain)")
+
+qqline(ua$gain[ua$very_late == TRUE], col = "red")
+```
+
+
+## T-tests 
+
+```{r t-test late}
+t.test(gain ~ late, data = ua)
+```
+
+
+```{r t-test very late}
+t.test(gain ~ very_late, data = ua)
+```
