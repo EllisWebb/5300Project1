@@ -1,0 +1,116 @@
+---
+author: "Hamda Hassan"
+title: "problem2"
+output: pdf_document
+---
+```{r}
+library(resampledata3)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(nycflights13)
+library(tibble)
+
+```
+
+## Question: What are the five most common destination airports for United Airlines flights from New York City? Describe the distribution and the average gain for each of these five airports.
+
+## Part one: Figure out the five most common destinations
+
+The most common airports fro the United Airlines are ORD, IAH, SFO, LAX, and DEN
+```{r}
+
+# Filter for United Airlines flights (carrier == "UA")
+ua_flights <- flights %>%
+  filter(carrier == "UA")
+
+# Count destinations and select the top 5
+top5_dests <- ua_flights %>%
+  count(dest, sort = TRUE) %>%
+  slice_max(n, n = 5)
+
+top5_dests_named <- top5_dests %>%
+  left_join(airports, by = c("dest" = "faa")) %>%
+  select(dest, name, n)
+
+top5_dests_named
+
+```
+
+## Part Two: Describe the distribution and the average gain for each of these five airports.
+Our gain variable which is the departure delay - the arrival delay tells us that across the 5 most frequent UA destinations, the average gain was relatively small. All the values are positive which indicates that flights arrived with less delay than it departed with. Flights to all 5 airports made up between 6.9 and 8.7 minutes on average.
+```{r}
+# Create the gain variables
+ua_flights <- flights %>%
+  filter(carrier == "UA") %>%
+  mutate(gain = dep_delay - arr_delay)
+
+
+# Filter to the top 5 destinations
+top5_codes <- top5_dests$dest
+
+ua_top5 <- ua_flights %>%
+  filter(dest %in% top5_codes)
+```
+
+```{r}
+avg_gain <- ua_top5 %>%
+  group_by(dest) %>%
+  summarize(
+    avg_gain = mean(gain, na.rm = TRUE),
+    median_gain = median(gain, na.rm = TRUE),
+    sd_gain = sd(gain, na.rm = TRUE),
+    n = n()
+  ) %>%
+  arrange(desc(n))
+
+avg_gain_named <- avg_gain %>%
+  left_join(airports, by = c("dest" = "faa")) %>%
+  select(dest, name, avg_gain, median_gain, sd_gain, n)
+
+avg_gain_named
+
+```
+## Plot the distribution
+We also created a box-plot to visualize the flight gains and learned that the distribution of gains for all five airports were similar. Each destination had a centered distribution slightly above zero, which meant most flights made up at least a small amount of lost time.
+- although most UA flights made up a small time in the air, the distribution remain highly variable, and extreme delays still occur across all 5 destinations.
+```{r}
+ggplot(ua_top5, aes(x = dest, y = gain)) +
+  geom_boxplot() +
+  labs(
+    title = "Distribution of Time Gain for Top 5 UA Destinations",
+    x = "Destination Airport",
+    y = "Gain (minutes)"
+  )
+```
+
+
+## Confidence Interval for Average Gain
+
+All 5 confidence intervals lie above zero, which confirms that UA flights to each of these destinations consistently make up time in the air on average. SFO, LAX, and ORD have slightly higher mean gains, but the intervals overlap across all airports. This suggests that although SFO appears to make up the most time (mean = 8.7 minutes), the differences between airports are modest and not extremely distinct.
+
+```{r}
+ci_gain <- ua_top5 %>%
+  group_by(dest) %>%
+  summarize(
+    mean_gain = mean(gain, na.rm = TRUE),
+    sd_gain = sd(gain, na.rm = TRUE),
+    n = n(),
+    se = sd_gain / sqrt(n),
+    lower = mean_gain - 1.96 * se,
+    upper = mean_gain + 1.96 * se
+  )
+
+ci_gain
+
+```
+
+## Regression Model (Gain - Destination + Distance + Flight Time)
+we fit a regression model using destination, distance, and air time as predictors. Air time was the strongest and most significant predictor, with longer flights tending to make up less time on average. Distance itself was not significant after accounting for air time. The destination coefficients were all significant, indicating that even after controlling for flight duration, certain airports consistently show higher or lower gains compared to others. The model explains about 35% of the variation in gain (R² = 0.35), suggesting that both flight characteristics and destination-specific factors contribute to how much time is recovered in the air.
+
+```{r}
+model <- lm(gain ~ dest + distance + air_time, data = ua_top5)
+summary(model)
+```
+
+

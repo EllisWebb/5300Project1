@@ -1,6 +1,0 @@
----
-title: "problem_2_hamda"
-output: html_document
----
-
-Will post my code here later today
