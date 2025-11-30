@@ -1,0 +1,140 @@
+---
+title: "Project-2"
+author: "Ruman Sidhu"
+date: "2025-11-29"
+output: html_document
+---
+
+# Project 2 - Question 3: Gain per hour
+``` {r setup, echo=TRUE}
+library(nycflights13)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+ua <- flights %>%
+  filter(carrier == "UA") %>%              # United only
+  drop_na(dep_delay, arr_delay, air_time)  # remove missing info
+glimpse(ua)
+summary(ua$dep_delay)
+summary(ua$arr_delay)
+summary(ua$air_time)
+ua <- ua %>%
+  mutate(
+    net_gain      = dep_delay - arr_delay,
+    air_time_hr   = air_time / 60,                     # convert to hours
+    gain_per_hour = net_gain / air_time_hr,
+    late_dep      = dep_delay > 0,                     # TRUE if dep delay > 0
+    late30_dep    = dep_delay > 30                     # TRUE if dep delay > 30
+  )
+summary(ua$gain_per_hour)
+table(ua$late_dep)
+table(ua$late30_dep)
+
+# Summary statistics: Late vs Not Late
+late_summary <- ua %>%
+  group_by(late_dep) %>%
+  summarise(
+    n = n(),
+    mean = mean(gain_per_hour),
+    sd = sd(gain_per_hour),
+    median = median(gain_per_hour)
+  )
+
+late_summary
+
+# Summary statistics: >30 min late vs <=30 min
+late30_summary <- ua %>%
+  group_by(late30_dep) %>%
+  summarise(
+    n = n(),
+    mean = mean(gain_per_hour),
+    sd = sd(gain_per_hour),
+    median = median(gain_per_hour)
+  )
+
+late30_summary
+```
+
+``` {r}
+late_summary <- ua %>%
+  group_by(late_dep) %>%
+  summarise(
+    n = n(),
+    mean = mean(gain_per_hour),
+    sd = sd(gain_per_hour),
+    median = median(gain_per_hour)
+  )
+
+late_summary
+```
+
+``` {r}
+late30_summary <- ua %>%
+  group_by(late30_dep) %>%
+  summarise(
+    n = n(),
+    mean = mean(gain_per_hour),
+    sd = sd(gain_per_hour),
+    median = median(gain_per_hour)
+  )
+
+late30_summary
+```
+
+
+``` {r}
+t_late <- t.test(gain_per_hour ~ late_dep, data = ua, var.equal = FALSE)
+t_late
+```
+
+
+```{r}
+t_late30 <- t.test(gain_per_hour ~ late30_dep, data = ua, var.equal = FALSE)
+t_late30
+```
+
+```{r}
+ggplot(ua, aes(x = late_dep, y = gain_per_hour)) +
+  geom_boxplot() +
+  scale_x_discrete(labels = c("On-time or early", "Late")) +
+  xlab("Departure Status") +
+  ylab("Gain per hour (minutes)") +
+  ggtitle("Gain per Hour by Departure Status") +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(ua, aes(x = late30_dep, y = gain_per_hour)) +
+  geom_boxplot() +
+  scale_x_discrete(labels = c("≤ 30 minutes late", "> 30 minutes late")) +
+  xlab("Departure Delay Group") +
+  ylab("Gain per hour (minutes)") +
+  ggtitle("Gain per Hour by Size of Departure Delay") +
+  theme_minimal()
+```
+
+
+```{r}
+late_ci <- ua %>%
+  group_by(late_dep) %>%
+  summarise(
+    mean = mean(gain_per_hour),
+    se = sd(gain_per_hour) / sqrt(n()),
+    n = n()
+  ) %>%
+  mutate(
+    lower = mean - qt(0.975, df = n - 1) * se,
+    upper = mean + qt(0.975, df = n - 1) * se
+  )
+ggplot(late_ci,
+       aes(x = factor(late_dep), y = mean)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.12) +
+  scale_x_discrete(labels = c("On-time or early", "Late")) +
+  xlab("Departure Status") +
+  ylab("Average Gain per Hour (minutes)") +
+  ggtitle("Average Gain per Hour (with 95% Confidence Intervals)") +
+  theme_minimal()
+```
